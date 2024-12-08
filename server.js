@@ -164,6 +164,8 @@ const renderNewsVideos = async () => {
 
                 await PostToTiktok(videoPath);
 
+                await fs.unlink(videoPath);
+
                 // Update the article with the video URL
                 if (videoPath) {
                     const { error: updateError } = await supabase

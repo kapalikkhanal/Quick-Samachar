@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const { exec } = require("child_process");
 
-const generateVideo = (imagePath, audioPath, outputPath) => {
+const generateVideo = async (imagePath, audioPath, outputPath) => {
     return new Promise((resolve, reject) => {
         // Ensure paths are absolute for FFmpeg
         const absoluteImagePath = path.resolve(imagePath);
@@ -26,6 +26,7 @@ const generateVideo = (imagePath, audioPath, outputPath) => {
                 console.error("FFmpeg stderr:", stderr);
             }
             console.log(`Video successfully generated at: ${absoluteOutputPath}`);
+            fs.unlink(absoluteImagePath);
             resolve(absoluteOutputPath);
         });
     });
