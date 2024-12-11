@@ -108,7 +108,7 @@ async function getInstagramCookies(url, application_name) {
 async function PostToInstagram(filePath) {
     try {
         const browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
             // executablePath: '/usr/bin/chromium-browser',
             args: [
                 '--start-maximized',
