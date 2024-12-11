@@ -26,7 +26,7 @@ const generateVideo = async (imagePath, audioPath, outputPath) => {
                 console.error("FFmpeg stderr:", stderr);
             }
             console.log(`Video successfully generated at: ${absoluteOutputPath}`);
-            fs.unlink(absoluteImagePath);
+            // fs.unlink(absoluteImagePath);
             resolve(absoluteOutputPath);
         });
     });

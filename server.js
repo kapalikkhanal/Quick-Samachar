@@ -3,213 +3,265 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const cors = require('cors');
 const cron = require('node-cron');
+const fs = require('fs').promises;
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
+const https = require('https');
+
 const { renderVideo } = require('./modules/remotion/render');
-const { PostToTiktok, getCookies } = require('./modules/tiktok/tiktok');
+const { PostToTiktok } = require('./modules/tiktok/tiktok');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3003;
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Supabase client setup
+const supabase = createClient(
+    process.env.SUPABASE_URL, 
+    process.env.SUPABASE_KEY
+);
 
-app.use(cors());
-
-const fetchHTML = async (url) => {
-    try {
-        const { data } = await axios.get(url);
-        return cheerio.load(data);
-    } catch (error) {
-        console.error(`Error fetching the URL: ${url}`, error);
-        throw error;
+// TikTok Video Posting Queue
+class TikTokPostQueue {
+    constructor() {
+        this.queue = [];
+        this.isProcessing = false;
     }
+
+    async enqueue(videoPath, articleId) {
+        this.queue.push({ videoPath, articleId });
+        await this.processQueue();
+    }
+
+    async processQueue() {
+        if (this.isProcessing) return;
+        this.isProcessing = true;
+
+        try {
+            while (this.queue.length > 0) {
+                const { videoPath, articleId } = this.queue.shift();
+
+                try {
+                    await PostToTiktok(videoPath);
+                    await fs.unlink(videoPath);
+
+                    await supabase
+                        .from('news_articles')
+                        .update({ 
+                            video_generation: true,
+                            processed_at: new Date().toISOString() 
+                        })
+                        .eq('id', articleId);
+
+                    console.log(`Posted and deleted video for article ID: ${articleId}`);
+                } catch (postError) {
+                    console.error(`Video posting error for ${videoPath}:`, postError);
+                    this.queue.unshift({ videoPath, articleId });
+                    break;
+                }
+            }
+        } catch (error) {
+            console.error('Queue processing error:', error);
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+}
+
+const tikTokPostQueue = new TikTokPostQueue();
+
+// Fetch HTML content
+const fetchHTML = (url) => {
+    return new Promise((resolve, reject) => {
+        https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }, (res) => {
+            let data = '';
+
+            // Collect data chunks
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            // On response end
+            res.on('end', () => {
+                try {
+                    const $ = cheerio.load(data);
+                    resolve($);
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }).on('error', (err) => {
+            reject(err);
+        });
+    });
 };
 
+// Paraphrase content
 const paraphraseContent = async (content) => {
     try {
         const response = await axios.post('https://gemini-uts6.onrender.com/api/askgemini', {
             text: content
         });
-
         return response.data.response || content;
     } catch (error) {
-        console.error('Error paraphrasing content:', error);
+        console.error('Paraphrasing error:', error.message);
         return content;
     }
 };
 
-// Function to scrape and save news
-const scrapeAndSaveNews = async () => {
+// Scrape and process news articles
+const scrapeAndProcessNews = async () => {
     const baseURL = 'https://www.onlinekhabar.com';
 
     try {
         const $ = await fetchHTML(baseURL);
+        if (!$) return [];
+
+        const processedArticles = [];
         const newsSections = $('.ok-bises');
 
-        await Promise.all(newsSections.map(async (_, section) => {
-            const newsItem = $(section);
-
+        for (let i = 0; i < newsSections.length; i++) {
+            const newsItem = $(newsSections[i]);
             const title = newsItem.find('h2 > a').text().trim();
             const fullLink = newsItem.find('h2 > a').attr('href');
 
-            if (!fullLink) return;
+            if (!fullLink) continue;
 
-            const newsPageURL = fullLink.startsWith('http') ? fullLink : `${baseURL}${fullLink}`;
+            const newsPageURL = fullLink.startsWith('http') 
+                ? fullLink 
+                : `${baseURL}${fullLink}`;
 
-            try {
-                const newsPage = await fetchHTML(newsPageURL);
-                const imageURL = newsPage('.ok-post-detail-featured-img img').attr('src');
-                const contentArray = [];
-                newsPage('.ok18-single-post-content-wrap p').each((_, element) => {
-                    contentArray.push(newsPage(element).text().trim());
-                });
+            // Check existing article
+            const { data: existingArticle } = await supabase
+                .from('news_articles')
+                .select('*')
+                .eq('link', newsPageURL)
+                .single();
 
-                const originalContent = contentArray.join('\n');
-                // console.log("here", originalContent)
-
-                // Check if article already exists
-                const { data: existingArticle, error: checkError } = await supabase
-                    .from('news_articles')
-                    .select('*')
-                    .eq('link', newsPageURL)
-                    .single();
-
-                if (checkError || !existingArticle) {
-                    console.log("here")
-                    // If article is new, insert it
-                    // First, get current articles count
-                    const { count } = await supabase
-                        .from('news_articles')
-                        .select('*', { count: 'exact' });
-
-                    // If we have 2 or more articles, delete the oldest one
-                    if (count >= 2) {
-                        const { data: oldestArticle } = await supabase
-                            .from('news_articles')
-                            .select('*')
-                            .order('timestamp', { ascending: true })
-                            .limit(1)
-                            .single();
-
-                        if (oldestArticle) {
-                            await supabase
-                                .from('news_articles')
-                                .delete()
-                                .eq('id', oldestArticle.id);
-                        }
-                    }
-
-                    const paraphrasedContent = await paraphraseContent(originalContent + "\n" + "Based on this news content, Summarize it in Nepali language, less than 200 characters, single paragraph, no extra explanation.");
-
-                    // Insert new article
-                    const { error } = await supabase
-                        .from('news_articles')
-                        .insert({
-                            title,
-                            link: newsPageURL,
-                            image_url: imageURL,
-                            content: paraphrasedContent,
-                            audio_url: null
-                        });
-
-                    if (error) {
-                        console.error('Error inserting article:', error);
-                    }
-                }
-            } catch (error) {
-                console.error(`Error processing article: ${newsPageURL}`, error);
+            if (existingArticle) {
+                processedArticles.push(existingArticle);
+                continue;
             }
-        }).filter(Boolean));
 
-        console.log('News scraping and saving completed');
+            // Fetch article details
+            const newsPage = await fetchHTML(newsPageURL);
+            if (!newsPage) continue;
+
+            const imageURL = newsPage('.ok-post-detail-featured-img img').attr('src');
+            const contentArray = [];
+            newsPage('.ok18-single-post-content-wrap p').each((_, element) => {
+                contentArray.push(newsPage(element).text().trim());
+            });
+
+            const originalContent = contentArray.join('\n');
+            const paraphrasedContent = await paraphraseContent(
+                `${originalContent}\nSummarize in Nepali, under 200 characters.`
+            );
+
+            // Insert new article
+            const { data: newArticle, error } = await supabase
+                .from('news_articles')
+                .insert({
+                    title,
+                    link: newsPageURL,
+                    image_url: imageURL,
+                    content: paraphrasedContent,
+                    video_generation: false
+                })
+                .select()
+                .single();
+
+            if (newArticle) processedArticles.push(newArticle);
+        }
+
+        return processedArticles;
     } catch (error) {
-        console.error('Error in scrapeAndSaveNews:', error);
+        console.error('News scraping error:', error);
+        return [];
     }
 };
 
-const renderNewsVideos = async () => {
+// Clean up old articles
+const cleanupOldArticles = async (currentArticles) => {
     try {
-        console.log("Rendering video started.")
-        // Fetch all news articles that haven't been processed for video
-        const { data: articles, error } = await supabase
+        const { data: allArticles } = await supabase
+            .from('news_articles')
+            .select('*');
+
+        const articlesToDelete = allArticles.filter(
+            oldArticle => !currentArticles.some(
+                newArticle => newArticle.link === oldArticle.link
+            )
+        );
+
+        if (articlesToDelete.length > 0) {
+            const deleteIds = articlesToDelete.map(article => article.id);
+            await supabase
+                .from('news_articles')
+                .delete()
+                .in('id', deleteIds);
+
+            console.log(`Deleted ${deleteIds.length} old articles`);
+        }
+    } catch (error) {
+        console.error('Article cleanup error:', error);
+    }
+};
+
+const processNewsVideos = async () => {
+    try {
+        const { data: articles } = await supabase
             .from('news_articles')
             .select('*')
-            .is('video_generation', null || false)
-            .order('timestamp', { ascending: true });
+            .eq('video_generation', false);
 
-        if (error) {
-            console.error('Error fetching articles:', error);
-            return;
-        }
-
-        if (!articles || articles.length === 0) {
-            console.log('No articles to process for video rendering');
-            return;
-        }
-
-        // Process articles sequentially
         for (const article of articles) {
             try {
-
-                const newsData = {
+                const videoPath = await renderVideo({
                     title: article.title,
                     content: article.content,
                     imageUrl: article.image_url
-                };
+                });
 
-                const videoPath = await renderVideo(newsData);
-                console.log('Generated Video Path:', videoPath);
-
-                await PostToTiktok(videoPath);
-
-                await fs.unlink(videoPath);
-
-                // Update the article with the video URL
                 if (videoPath) {
-                    const { error: updateError } = await supabase
-                        .from('news_articles')
-                        .update({
-                            video_generation: true,
-                            processed_at: new Date().toISOString()
-                        })
-                        .eq('id', article.id);
-
-                    if (updateError) {
-                        console.error(`Error updating article ${article.id} with video URL:`, updateError);
-                    } else {
-                        console.log(`Processed video for article: ${article.title}`);
-                    }
+                    // Enqueue video for posting
+                    await tikTokPostQueue.enqueue(videoPath, article.id);
                 }
             } catch (renderError) {
-                console.error(`Error rendering video for article ${article.id}:`, renderError);
+                console.error(`Video generation error for ${article.title}:`, renderError);
             }
         }
     } catch (error) {
-        console.error('Error in renderNewsVideos:', error);
+        console.error('News video processing error:', error);
     }
 };
 
-// Modify the existing cron job
-cron.schedule('*/10 * * * *', async () => {
-    console.log('Running news scraping and video rendering job');
-    await scrapeAndSaveNews();
-    await renderNewsVideos();
-});
+// Main news processing job
+const newsProcessingJob = async () => {
+    console.log('Starting news processing job');
+    const currentArticles = await scrapeAndProcessNews();
+    await cleanupOldArticles(currentArticles);
+    await processNewsVideos();
+};
 
+// Schedule periodic job
+cron.schedule('*/10 * * * *', newsProcessingJob);
+
+// Manual trigger endpoint
 app.get('/trigger-scrape', async (req, res) => {
     try {
-        await scrapeAndSaveNews();
-        await renderNewsVideos();
-        res.json({ message: 'Scraping triggered successfully' });
+        await newsProcessingJob();
+        res.json({ message: 'News processing completed successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error triggering scrape', error: error.message });
+        res.status(500).json({ 
+            message: 'News processing failed', 
+            error: error.message 
+        });
     }
 });
 
-// getCookies('https://www.tiktok.com/login', 'tiktok')
-
+// Start server
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log('Initial news processing job starting...');
+    newsProcessingJob(); // Initial run on startup
 });

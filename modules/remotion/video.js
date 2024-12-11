@@ -9,7 +9,7 @@ export const VideoBackground = ({ newsData }) => {
         return null;
     }
 
-    console.error(newsData)
+    // console.error(newsData)
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
 

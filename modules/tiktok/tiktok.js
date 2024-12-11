@@ -38,7 +38,7 @@ async function getCookies(url, application_name) {
     try {
         // Launch the browser in non-headless mode
         const browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
             args: [
                 '--start-maximized',
                 '--no-sandbox',
@@ -72,7 +72,8 @@ async function getCookies(url, application_name) {
 async function PostToTiktok(filePath) {
     try {
         const browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
+            executablePath: '/usr/bin/chromium-browser',
             args: [
                 '--start-maximized',
                 '--no-sandbox',
