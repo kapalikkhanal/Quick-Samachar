@@ -107,19 +107,19 @@ async function getInstagramCookies(url, application_name) {
 
 async function PostToInstagram(filePath) {
     try {
-        const browser = await puppeteer.launch({
+        const { browser, page } = await connect({
             headless: false,
+            turnstile: true, // Optional: helps bypass Cloudflare challenges
             args: [
                 '--start-maximized',
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-blink-features=AutomationControlled',
             ],
-            ignoreDefaultArgs: ['--enable-automation', '--disable-extensions', '--disable-default-apps', '--disable-component-extensions-with-background-pages'],
-            defaultViewport: null
+            fingerprint: true, // Optional: generates a more realistic browser fingerprint
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
         });
 
-        const page = await browser.newPage();
         await page.goto('https://www.instagram.com/accounts/login/', {
             waitUntil: 'networkidle2'
         });
