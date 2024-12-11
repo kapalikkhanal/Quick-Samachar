@@ -73,7 +73,7 @@ async function PostToTiktok(filePath) {
     try {
         const browser = await puppeteer.launch({
             headless: true,
-            executablePath: '/usr/bin/chromium-browser',
+            // executablePath: '/usr/bin/chromium-browser',
             args: [
                 '--start-maximized',
                 '--no-sandbox',

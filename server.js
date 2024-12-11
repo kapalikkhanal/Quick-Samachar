@@ -9,14 +9,15 @@ require('dotenv').config();
 const https = require('https');
 
 const { renderVideo } = require('./modules/remotion/render');
-const { PostToTiktok } = require('./modules/tiktok/tiktok');
+const { PostToTiktok, getTiktokCookies } = require('./modules/tiktok/tiktok');
+const { PostToInstagram, getInstagramCookies } = require('./modules/instagram/instagram');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
 
 // Supabase client setup
 const supabase = createClient(
-    process.env.SUPABASE_URL, 
+    process.env.SUPABASE_URL,
     process.env.SUPABASE_KEY
 );
 
@@ -41,14 +42,15 @@ class TikTokPostQueue {
                 const { videoPath, articleId } = this.queue.shift();
 
                 try {
-                    await PostToTiktok(videoPath);
+                    // await PostToTiktok(videoPath);
+                    await PostToInstagram(videoPath);
                     await fs.unlink(videoPath);
 
                     await supabase
                         .from('news_articles')
-                        .update({ 
+                        .update({
                             video_generation: true,
-                            processed_at: new Date().toISOString() 
+                            processed_at: new Date().toISOString()
                         })
                         .eq('id', articleId);
 
@@ -126,8 +128,8 @@ const scrapeAndProcessNews = async () => {
 
             if (!fullLink) continue;
 
-            const newsPageURL = fullLink.startsWith('http') 
-                ? fullLink 
+            const newsPageURL = fullLink.startsWith('http')
+                ? fullLink
                 : `${baseURL}${fullLink}`;
 
             // Check existing article
@@ -244,7 +246,10 @@ const newsProcessingJob = async () => {
 };
 
 // Schedule periodic job
-cron.schedule('*/10 * * * *', newsProcessingJob);
+// cron.schedule('*/1 * * * *', newsProcessingJob);
+
+// getTiktokCookies('https://www.tiktok.com/login', 'tiktok')
+getInstagramCookies('https://www.instagram.com/accounts/login/', 'instagram')
 
 // Manual trigger endpoint
 app.get('/trigger-scrape', async (req, res) => {
@@ -252,14 +257,13 @@ app.get('/trigger-scrape', async (req, res) => {
         await newsProcessingJob();
         res.json({ message: 'News processing completed successfully' });
     } catch (error) {
-        res.status(500).json({ 
-            message: 'News processing failed', 
-            error: error.message 
+        res.status(500).json({
+            message: 'News processing failed',
+            error: error.message
         });
     }
 });
 
-// Start server
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log('Initial news processing job starting...');
