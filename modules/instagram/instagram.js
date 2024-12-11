@@ -92,7 +92,7 @@ async function getInstagramCookies(url, application_name) {
         });
 
         console.log("Waiting for 100 seconds...");
-        await new Promise(resolve => setTimeout(resolve, 100000));
+        await new Promise(resolve => setTimeout(resolve, 150000));
 
         await saveSessionData(page, `${application_name}_cookies.json`);
         console.log("Session data saved.");
@@ -109,6 +109,7 @@ async function PostToInstagram(filePath) {
     try {
         const browser = await puppeteer.launch({
             headless: false,
+            // executablePath: '/usr/bin/chromium-browser',
             args: [
                 '--start-maximized',
                 '--no-sandbox',
@@ -161,10 +162,22 @@ async function PostToInstagram(filePath) {
 
         await new Promise(resolve => setTimeout(resolve, 5000));
 
-        await page.keyboard.press('Tab');
-        await new Promise(resolve => setTimeout(resolve, 200));
-        await page.keyboard.press('Enter');
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await page.waitForSelector('div.x78zum5.x1q0g3np.xdko459');
+        await page.evaluate(() => {
+            const okButtonDiv = Array.from(document.querySelectorAll('div.x78zum5.x1q0g3np.xdko459'))
+                .find(div => div.textContent.includes('OK'));
+            if (okButtonDiv) {
+                const okButton = okButtonDiv.querySelector('button');
+                if (okButton) okButton.click();
+            }
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // await page.keyboard.press('Tab');
+        // await new Promise(resolve => setTimeout(resolve, 200));
+        // await page.keyboard.press('Enter');
+        // await new Promise(resolve => setTimeout(resolve, 500));
 
         // Steps to choose original video aspect ratio
         await page.waitForSelector('svg[aria-label="Select crop"]');
