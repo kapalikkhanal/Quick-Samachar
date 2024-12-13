@@ -42,7 +42,7 @@ class TikTokPostQueue {
                 const { videoPath, articleId } = this.queue.shift();
 
                 try {
-                    // await PostToTiktok(videoPath);
+                    await PostToTiktok(videoPath);
                     await PostToInstagram(videoPath);
                     await fs.unlink(videoPath);
 
@@ -246,10 +246,10 @@ const newsProcessingJob = async () => {
 };
 
 // Schedule periodic job
-// cron.schedule('*/1 * * * *', newsProcessingJob);
+cron.schedule('*/10 * * * *', newsProcessingJob);
 
 // getTiktokCookies('https://www.tiktok.com/login', 'tiktok')
-getInstagramCookies('https://www.instagram.com/accounts/login/', 'instagram')
+// getInstagramCookies('https://www.instagram.com/accounts/login/', 'instagram')
 
 // Manual trigger endpoint
 app.get('/trigger-scrape', async (req, res) => {
