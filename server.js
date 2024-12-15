@@ -254,12 +254,22 @@ cron.schedule('*/10 * * * *', newsProcessingJob);
 // Manual trigger endpoint
 app.get('/trigger-scrape', async (req, res) => {
     try {
+        res.json({ message: 'Trigerred Successfully.' });
         await newsProcessingJob();
-        res.json({ message: 'News processing completed successfully' });
     } catch (error) {
         res.status(500).json({
             message: 'News processing failed',
             error: error.message
+        });
+    }
+});
+
+app.get('/health-check', async (req, res) => {
+    try {
+        res.json({ message: 'Server is working fine.' });
+    } catch (error) {
+        res.status(500).json({
+            message: 'Server failed'
         });
     }
 });
