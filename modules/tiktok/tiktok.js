@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-extra');
+const { connect } = require('puppeteer-real-browser');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const stealthPlugin = StealthPlugin();
 stealthPlugin.enabledEvasions.delete('iframe.contentWindow');
@@ -34,23 +35,24 @@ async function saveSessionData(page, sessionFilePath) {
     console.log("Session data saved.");
 }
 
-async function getCookies(url, application_name) {
+async function getTiktokCookies(url, application_name) {
     try {
         // Launch the browser in non-headless mode
-        const browser = await puppeteer.launch({
+        const { browser, page } = await connect({
             headless: true,
+            turnstile: true, // Optional: helps bypass Cloudflare challenges
+
+            // executablePath: '/usr/bin/chromium-browser',
             args: [
                 '--start-maximized',
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-blink-features=AutomationControlled',
             ],
-            ignoreDefaultArgs: ['--enable-automation', '--disable-extensions', '--disable-default-apps', '--disable-component-extensions-with-background-pages'],
-            defaultViewport: null
+            fingerprint: true, // Optional: generates a more realistic browser fingerprint
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
         });
 
-        // Open a new page and navigate to TikTok's upload URL
-        const page = await browser.newPage();
         await page.setBypassCSP(true)
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36');
 
@@ -71,17 +73,20 @@ async function getCookies(url, application_name) {
 
 async function PostToTiktok(filePath) {
     try {
-        const browser = await puppeteer.launch({
+        const { browser, page } = await connect({
             headless: true,
+            turnstile: true, // Optional: helps bypass Cloudflare challenges
+
             // executablePath: '/usr/bin/chromium-browser',
             args: [
                 '--start-maximized',
                 '--no-sandbox',
-                '--disable-setuid-sandbox'
-            ]
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+            ],
+            fingerprint: true, // Optional: generates a more realistic browser fingerprint
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
         });
-
-        const page = await browser.newPage();
 
         await page.goto('https://tiktok.com/login', {
             waitUntil: 'networkidle2'
@@ -214,4 +219,4 @@ async function PostToTiktok(filePath) {
     }
 }
 
-module.exports = { PostToTiktok, getCookies };
+module.exports = { PostToTiktok, getTiktokCookies };

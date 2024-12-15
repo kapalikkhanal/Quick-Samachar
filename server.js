@@ -43,7 +43,7 @@ class TikTokPostQueue {
 
                 try {
                     await PostToTiktok(videoPath);
-                    await PostToInstagram(videoPath);
+                    // await PostToInstagram(videoPath);
                     await fs.unlink(videoPath);
 
                     await supabase

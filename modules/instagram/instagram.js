@@ -110,6 +110,8 @@ async function PostToInstagram(filePath) {
         const { browser, page } = await connect({
             headless: false,
             turnstile: true, // Optional: helps bypass Cloudflare challenges
+            
+        // executablePath: '/usr/bin/chromium-browser',
             args: [
                 '--start-maximized',
                 '--no-sandbox',
