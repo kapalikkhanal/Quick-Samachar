@@ -16,7 +16,7 @@ const debug = {
         console.log(logMessage);
 
         // Also write to a log file
-        fs.appendFileSync('tiktok-upload.log', logMessage + '\n');
+        // fs.appendFileSync('tiktok-upload.log', logMessage + '\n');
     },
     error: (message, error) => {
         const errorDetail = error ? `\nError Details: ${error.message}\nStack: ${error.stack}` : '';
