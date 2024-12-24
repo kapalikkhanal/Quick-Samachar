@@ -39,7 +39,7 @@ async function getTiktokCookies(url, application_name) {
     try {
         // Launch the browser in non-headless mode
         const { browser, page } = await connect({
-            headless: true,
+            headless: false,
             turnstile: true, // Optional: helps bypass Cloudflare challenges
 
             // executablePath: '/usr/bin/chromium-browser',
@@ -74,7 +74,7 @@ async function getTiktokCookies(url, application_name) {
 async function PostToTiktok(filePath) {
     try {
         const { browser, page } = await connect({
-            headless: true,
+            headless: false,
             turnstile: true, // Optional: helps bypass Cloudflare challenges
 
             // executablePath: '/usr/bin/chromium-browser',
@@ -106,6 +106,65 @@ async function PostToTiktok(filePath) {
             timeout: 30000  // 30 second timeout
         });
 
+        // if (inputFile) {
+        //     await inputFile.uploadFile(filePath);
+        //     console.log('Waiting for file upload to complete...');
+
+
+        //     try {
+        //         const progressMonitor = setInterval(async () => {
+
+        //             // class="jsx-1979214919 info-progress-num info"
+
+        //             try {
+        //                 const progressElement = await page.$('div.info-progress-num');
+        //                 if (progressElement) {
+        //                     const progressText = await progressElement.evaluate(el => el.textContent);
+        //                     console.log(`Upload progress: ${progressText}`);
+
+        //                     if (progressText === '100%') {
+        //                         clearInterval(progressMonitor);
+        //                         console.log('Upload completed successfully');
+        //                     }
+        //                 }
+        //             } catch (error) {
+        //                 // Silently fail if element isn't found yet
+        //                 console.log('No upload data found.');
+        //             }
+        //         }, 1000);
+
+        //         await Promise.race([
+        //             // Check for "Uploaded" text
+        //             page.waitForSelector('span.TUXText.TUXText--tiktok-sans:contains("Uploaded")', {
+        //                 visible: true,
+        //                 timeout: 120000
+        //             }),
+
+
+        //             // Check for 100% progress
+        //             page.waitForSelector('div.info-progress-num', {
+        //                 visible: true,
+        //                 timeout: 120000
+        //             }).then(async (element) => {
+
+        //                 console.log('Waiting for selector.')
+        //                 await page.waitForFunction(
+        //                     (el) => el.textContent === '100%',
+        //                     { timeout: 120000 },
+        //                     element
+        //                 );
+        //             })
+        //         ]);
+
+        //     } catch (error) {
+        //         console.error('Upload percentage error.');
+        //     }
+        // } else {
+        //     console.log("File input element not found.");
+        //     throw new Error("File input element not found");
+        // }
+        // console.log("Upload Successfull.")
+
         if (inputFile) {
             await inputFile.uploadFile(filePath);
             console.log('Waiting for file upload to complete...');
@@ -113,54 +172,82 @@ async function PostToTiktok(filePath) {
             try {
                 const progressMonitor = setInterval(async () => {
                     try {
-                        const progressElement = await page.$('div.jsx-305849304.info-progress-num');
+                        // Look for progress using multiple selectors and methods
+                        const progressElement = await page.$('[role="progressbar"], progress, .info-progress, .info-progress-num');
                         if (progressElement) {
-                            const progressText = await progressElement.evaluate(el => el.textContent);
-                            console.log(`Upload progress: ${progressText}`);
+                            const progress = await progressElement.evaluate(el => {
+                                // Try different ways to get progress
+                                const style = window.getComputedStyle(el);
+                                const widthProgress = parseFloat(style.width) / parseFloat(style.maxWidth) * 100;
+                                return widthProgress || el.value || 0;
+                            });
+                            console.log(`Upload progress: ${progress}%`);
 
-                            if (progressText === '100%') {
+                            if (progress >= 100) {
                                 clearInterval(progressMonitor);
-                                console.log('Upload completed successfully');
+                                console.log('Progress reached 100%');
                             }
                         }
                     } catch (error) {
-                        // Silently fail if element isn't found yet
+                        console.log('Progress check failed, continuing...');
                     }
                 }, 1000);
 
                 await Promise.race([
-                    // Check for "Uploaded" text
-                    page.waitForSelector('span.TUXText.TUXText--tiktok-sans:contains("Uploaded")', {
-                        visible: true,
-                        timeout: 120000
-                    }),
+                    // Check for success using multiple indicators
+                    Promise.any([
+                        // Check for success icon
+                        page.waitForSelector('[data-icon*="Check"], [data-icon*="Success"]', {
+                            visible: true,
+                            timeout: 120000
+                        }),
+                        // Check for "Uploaded" text in any element
+                        page.waitForFunction(
+                            () => Array.from(document.querySelectorAll('*'))
+                                .some(el => el.textContent.includes('Uploaded')),
+                            { timeout: 120000 }
+                        ),
+                        // Check for success state in any progress indicator
+                        page.waitForSelector('[aria-label*="success"], [data-status="success"]', {
+                            visible: true,
+                            timeout: 120000
+                        })
+                    ]),
 
-
-                    // Check for 100% progress
-                    page.waitForSelector('div.jsx-305849304.info-progress-num', {
-                        visible: true,
-                        timeout: 120000
-                    }).then(async (element) => {
-                        await page.waitForFunction(
-                            (el) => el.textContent === '100%',
-                            { timeout: 120000 },
-                            element
-                        );
-                    })
+                    // Check for 100% progress using multiple methods
+                    page.waitForFunction(
+                        () => {
+                            const progressElements = document.querySelectorAll('[role="progressbar"], progress, .info-progress');
+                            return Array.from(progressElements).some(el => {
+                                const style = window.getComputedStyle(el);
+                                const progress = parseFloat(style.width) / parseFloat(style.maxWidth) * 100;
+                                return progress >= 100 || el.value >= 100;
+                            });
+                        },
+                        { timeout: 120000 }
+                    )
                 ]);
 
+                clearInterval(progressMonitor);
             } catch (error) {
-                console.error('Upload verification failed:', error);
-                throw new Error('Upload verification timeout - upload may not have completed successfully');
+                console.error('Upload monitoring failed:', error.message);
+                throw error;
             }
         } else {
             console.log("File input element not found.");
             throw new Error("File input element not found");
         }
+        console.log("Upload Successful.");
 
+        // <div class="DraftEditor-editorContainer"><div aria-autocomplete="list" aria-expanded="false" class="notranslate public-DraftEditor-content" contenteditable="true" role="combobox" spellcheck="false" style="outline: none; user-select: text; white-space: pre-wrap; overflow-wrap: break-word;"><div data-contents="true"><div class="" data-block="true" data-editor="4o39t" data-offset-key="f7kpm-0-0"><div data-offset-key="f7kpm-0-0" class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr"><span data-offset-key="f7kpm-0-0"><span data-text="true">f9e5bf0fa924</span></span></div></div></div></div></div></div></div>
         // await new Promise(resolve => setTimeout(resolve, 15000));
-        await page.waitForSelector('.public-DraftEditor-content');
-        await page.click('.public-DraftEditor-content');
+        // await page.waitForSelector('.DraftEditor-editorContainer');
+        // await page.click('.DraftEditor-editorContainer');
+
+        // Write caption 
+        await page.waitForSelector('div[role="combobox"]');
+        await page.click('div[role="combobox"]');
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         await page.keyboard.down('Control');
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -191,21 +278,14 @@ async function PostToTiktok(filePath) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Wait for the 'Post' button to appear and click it
-        await page.waitForSelector(`.TUXButton.TUXButton--default.TUXButton--large.TUXButton--primary`, { visible: true });
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const postButtonSelector = '.TUXButton.TUXButton--default.TUXButton--large.TUXButton--primary';
-        await page.evaluate((postButtonSelector) => {
-            const createButton = Array.from(document.querySelectorAll(postButtonSelector))
-                .find(element => element.textContent.includes('Post'));
-            if (createButton) {
-                createButton.click();
-            } else {
-                console.log('Post button not found.');
-            }
-        }, postButtonSelector);
+        await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('[role="button"]'));
+            const nextButton = buttons.find(button => button.textContent.trim() === 'Post');
+            if (nextButton) nextButton.click();
+        });
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
         await new Promise(resolve => {
             const randomDelay = Math.floor(Math.random() * (60000 - 45000 + 1)) + 45000;

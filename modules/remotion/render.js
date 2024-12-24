@@ -23,10 +23,13 @@ const generateVideo = async (imagePath, audioPath, outputPath) => {
                 return;
             }
             if (stderr) {
-                console.error("FFmpeg stderr:", stderr);
+                // console.error("FFmpeg stderr:");
             }
             console.log(`Video successfully generated at: ${absoluteOutputPath}`);
             // fs.unlink(absoluteImagePath);
+            fs.unlink(absoluteImagePath, (err) => {
+                if (err) console.error('Error deleting image:', err);
+            });
             resolve(absoluteOutputPath);
         });
     });

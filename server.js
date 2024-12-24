@@ -246,7 +246,7 @@ const newsProcessingJob = async () => {
 };
 
 // Schedule periodic job
-cron.schedule('*/10 * * * *', newsProcessingJob);
+// cron.schedule('*/10 * * * *', newsProcessingJob);
 
 // getTiktokCookies('https://www.tiktok.com/login', 'tiktok')
 // getInstagramCookies('https://www.instagram.com/accounts/login/', 'instagram')
