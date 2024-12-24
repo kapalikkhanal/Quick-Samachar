@@ -1,0 +1,27 @@
+[2024-12-24T12:51:28.211Z] [INFO] Initializing TikTok upload process
+[2024-12-24T12:51:28.213Z] [INFO] Video file: C:\Users\kapal\Desktop\Quick-Samachar\output\9766c81d2cd0.mp4
+[2024-12-24T12:51:30.774Z] [INFO] Loading session data
+[2024-12-24T12:51:30.785Z] [INFO] Loading 32 cookies
+[2024-12-24T12:51:30.925Z] [INFO] Loading 50 localStorage items
+[2024-12-24T12:51:30.991Z] [ERROR] Failed to load session data: SecurityError: Failed to read the 'localStorage' property from 'Window': Access is denied for this document.
+Array.forEach (<anonymous>)
+app.js:2:47
+[2024-12-24T12:51:30.993Z] [ERROR] Stack trace: DOMException: SecurityError: Failed to read the 'localStorage' property from 'Window': Access is denied for this document.
+Array.forEach (<anonymous>)
+app.js:2:47
+    at #evaluate (C:\Users\kapal\Desktop\Quick-Samachar\node_modules\rebrowser-puppeteer-core\lib\cjs\puppeteer\cdp\ExecutionContext.js:572:56)
+    at async ExecutionContext.evaluate (C:\Users\kapal\Desktop\Quick-Samachar\node_modules\rebrowser-puppeteer-core\lib\cjs\puppeteer\cdp\ExecutionContext.js:285:16)
+    at async IsolatedWorld.evaluate (C:\Users\kapal\Desktop\Quick-Samachar\node_modules\rebrowser-puppeteer-core\lib\cjs\puppeteer\cdp\IsolatedWorld.js:118:16)
+    at async CdpFrame.evaluate (C:\Users\kapal\Desktop\Quick-Samachar\node_modules\rebrowser-puppeteer-core\lib\cjs\puppeteer\api\Frame.js:348:20)
+    at async CdpPage.evaluate (C:\Users\kapal\Desktop\Quick-Samachar\node_modules\rebrowser-puppeteer-core\lib\cjs\puppeteer\api\Page.js:812:20)
+    at async SessionManager.loadSessionData (C:\Users\kapal\Desktop\Quick-Samachar\modules\tiktok\tiktok.js:68:13)
+    at async PostToTiktok (C:\Users\kapal\Desktop\Quick-Samachar\modules\tiktok\tiktok.js:247:31)
+    at async TikTokPostQueue.processQueue (C:\Users\kapal\Desktop\Quick-Samachar\server.js:45:21)
+    at async TikTokPostQueue.enqueue (C:\Users\kapal\Desktop\Quick-Samachar\server.js:33:9)
+[2024-12-24T12:51:30.998Z] [ERROR] TikTok upload failed: Failed to load session data
+[2024-12-24T12:51:31.000Z] [ERROR] Stack trace: Error: Failed to load session data
+    at PostToTiktok (C:\Users\kapal\Desktop\Quick-Samachar\modules\tiktok\tiktok.js:250:19)
+    at async TikTokPostQueue.processQueue (C:\Users\kapal\Desktop\Quick-Samachar\server.js:45:21)
+    at async TikTokPostQueue.enqueue (C:\Users\kapal\Desktop\Quick-Samachar\server.js:33:9)
+    at async processNewsVideos (C:\Users\kapal\Desktop\Quick-Samachar\server.js:229:21)
+    at async newsProcessingJob (C:\Users\kapal\Desktop\Quick-Samachar\server.js:245:5)
