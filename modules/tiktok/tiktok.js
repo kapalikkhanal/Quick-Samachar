@@ -187,7 +187,7 @@ async function PostToTiktok(filePath) {
 
         debug.log('Launching browser');
         const connection = await connect({
-            headless: false,
+            headless: true,
             turnstile: true,
             args: [
                 '--start-maximized',
@@ -302,11 +302,22 @@ async function PostToTiktok(filePath) {
         await page.keyboard.up('Control');
         await page.keyboard.press('Backspace');
 
-        const caption = `Follow for more news content like these.`;
+        const caption = `Follow for more news content like these. \n \n`;
+        const hashtags = "#news #quicknews #nepal #nepali #samachar #fyp"
+        const hashtagList = hashtags.split(' ');
+
         await page.evaluate((text) => navigator.clipboard.writeText(text), caption);
         await page.keyboard.down('Control');
         await page.keyboard.press('V');
         await page.keyboard.up('Control');
+
+        for (const hashtag of hashtagList) {
+            for (const char of hashtag) {
+                await page.keyboard.type(char, { delay: 100 + Math.floor(Math.random() * 100) });
+            }
+            await new Promise(resolve => setTimeout(resolve, 1600));
+            await page.keyboard.press('Tab');
+        }
 
         debug.log('Finalizing post');
         await new Promise(resolve => setTimeout(resolve, 500));
