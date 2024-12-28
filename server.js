@@ -28,8 +28,8 @@ class TikTokPostQueue {
         this.isProcessing = false;
     }
 
-    async enqueue(videoPath, articleId) {
-        this.queue.push({ videoPath, articleId });
+    async enqueue(videoPath, articleId, hashtags) {
+        this.queue.push({ videoPath, articleId, hashtags });
         await this.processQueue();
     }
 
@@ -39,10 +39,10 @@ class TikTokPostQueue {
 
         try {
             while (this.queue.length > 0) {
-                const { videoPath, articleId } = this.queue.shift();
+                const { videoPath, articleId, hashtags } = this.queue.shift();
 
                 try {
-                    await PostToTiktok(videoPath);
+                    await PostToTiktok(videoPath, hashtags);
                     // await PostToInstagram(videoPath);
                     await fs.unlink(videoPath);
 
@@ -156,8 +156,11 @@ const scrapeAndProcessNews = async () => {
 
             const originalContent = contentArray.join('\n');
             const paraphrasedContent = await paraphraseContent(
-                `${originalContent}\nSummarize in Nepali, under 200 characters.`
+                `${originalContent}\nSummarize in Nepali, under 200 characters. Also give atleast 10 tiktok trendings hastags in english with all lowercase. Concatenate summary and hashtags with this symbol ->.`
             );
+            // console.log( paraphrasedContent)
+            const [summary, hashtags] = paraphrasedContent.split("->");
+            // console.log(summary, hashtagsText)
 
             // Insert new article
             const { data: newArticle, error } = await supabase
@@ -166,7 +169,8 @@ const scrapeAndProcessNews = async () => {
                     title,
                     link: newsPageURL,
                     image_url: imageURL,
-                    content: paraphrasedContent,
+                    content: summary.trim(),
+                    hashtags: hashtags.trim(),
                     video_generation: false
                 })
                 .select()
@@ -226,7 +230,7 @@ const processNewsVideos = async () => {
 
                 if (videoPath) {
                     // Enqueue video for posting
-                    await tikTokPostQueue.enqueue(videoPath, article.id);
+                    await tikTokPostQueue.enqueue(videoPath, article.id, article.hashtags);
                 }
             } catch (renderError) {
                 console.error(`Video generation error for ${article.title}:`, renderError);

@@ -178,7 +178,7 @@ async function checkUploadStatus(page) {
     }
 }
 
-async function PostToTiktok(filePath) {
+async function PostToTiktok(filePath, hashtags = '') {
     let browser, page;
     try {
         if (!fs.existsSync(filePath)) {
@@ -187,7 +187,7 @@ async function PostToTiktok(filePath) {
 
         debug.log('Launching browser');
         const connection = await connect({
-            headless: true,
+            headless: false,
             turnstile: true,
             args: [
                 '--start-maximized',
@@ -303,7 +303,6 @@ async function PostToTiktok(filePath) {
         await page.keyboard.press('Backspace');
 
         const caption = `Follow for more news content like these. \n \n`;
-        const hashtags = "#news #quicknews #nepal #nepali #samachar #fyp"
         const hashtagList = hashtags.split(' ');
 
         await page.evaluate((text) => navigator.clipboard.writeText(text), caption);
